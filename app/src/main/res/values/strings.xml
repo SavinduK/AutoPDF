@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">SlideCapture</string>
+    <string name="start_capture">Start Capture</string>
+    <string name="stop_capture">Stop Capture</string>
+    <string name="pause_capture">Pause</string>
+    <string name="resume_capture">Resume</string>
+    <string name="capture_running">Slide capture running…</string>
+    <string name="notification_channel_name">Slide Capture Service</string>
+    <string name="notification_channel_desc">Shows active slide recording status</string>
+</resources>

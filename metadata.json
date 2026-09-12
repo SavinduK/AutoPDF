@@ -1,0 +1,6 @@
+{
+  "name": "SlideCapture",
+  "description": "Automatic lecture slide recording with edge-detection cropping, perceptual deduplication, and PDF export",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
