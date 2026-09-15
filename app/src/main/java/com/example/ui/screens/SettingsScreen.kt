@@ -1,9 +1,5 @@
 package com.example.ui.screens
 
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,13 +14,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,7 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,21 +52,19 @@ fun SettingsScreen(
     viewModel: SlideViewModel,
     onNavigateBack: () -> Unit
 ) {
-    val context = LocalContext.current
     val currentInterval by viewModel.captureIntervalSeconds.collectAsState()
     val isAutoEdgeEnabled by viewModel.isAutoEdgeDetectionEnabled.collectAsState()
-    val isOverlayEnabled by viewModel.isFloatingOverlayEnabled.collectAsState()
+    val isEnhanceContrastEnabled by viewModel.isEnhanceContrastEnabled.collectAsState()
+    val isSilentCaptureEnabled by viewModel.isSilentCaptureEnabled.collectAsState()
 
     var customIntervalSlider by remember(currentInterval) {
         mutableFloatStateOf(currentInterval.toFloat())
     }
 
-    val hasOverlayPermission = Settings.canDrawOverlays(context)
-
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                title = { Text("Lecture Capture Settings", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -108,14 +100,14 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Capture Interval",
+                            "Camera Capture Interval",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
                     Text(
-                        "How frequently SlideCapture takes a screen snapshot during class:",
+                        "How frequently the camera analyzes the lecture hall projector screen:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
@@ -126,7 +118,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf(5, 10, 30, 60).forEach { seconds ->
+                        listOf(5, 10, 15, 30, 60).forEach { seconds ->
                             val label = if (seconds == 60) "1 min" else "${seconds}s"
                             FilterChip(
                                 selected = currentInterval == seconds,
@@ -142,7 +134,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        "Custom: ${customIntervalSlider.toInt()} seconds",
+                        "Custom Interval: ${customIntervalSlider.toInt()} seconds",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -153,8 +145,8 @@ fun SettingsScreen(
                             customIntervalSlider = it
                             viewModel.captureIntervalSeconds.value = it.toInt().coerceAtLeast(3)
                         },
-                        valueRange = 3f..120f,
-                        steps = 117,
+                        valueRange = 3f..60f,
+                        steps = 57,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("interval_slider")
@@ -162,7 +154,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Edge Detection & Auto-Cropping Card
+            // Keystone & Edge Detection Card
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
@@ -184,12 +176,12 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    "OpenCV Edge Detection",
+                                    "Projector Keystone Rectification",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    "Auto-detect slide contour and perspective crop",
+                                    "Auto-detects angled screen in lecture hall & straightens to 16:9",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -208,14 +200,14 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        "If no confident rectangular slide contour is detected, the capture automatically falls back to your manually defined crop region.",
+                        "When sitting off-center in the lecture hall, perspective keystone correction warps the trapezoid screen into a flat, readable rectangular slide.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // Floating Overlay Control Card
+            // Contrast & Glare Enhancement Card
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
@@ -230,19 +222,19 @@ fun SettingsScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             Icon(
-                                Icons.Default.Layers,
+                                Icons.Default.Contrast,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    "Floating Mini Overlay",
+                                    "Projector Contrast Boost",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    "Start, pause, and stop capture from anywhere",
+                                    "Removes lecture hall glare & ambient wash-out",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -250,71 +242,56 @@ fun SettingsScreen(
                         }
 
                         Switch(
-                            checked = isOverlayEnabled,
+                            checked = isEnhanceContrastEnabled,
                             onCheckedChange = {
-                                viewModel.isFloatingOverlayEnabled.value = it
+                                viewModel.isEnhanceContrastEnabled.value = it
                             },
-                            modifier = Modifier.testTag("floating_overlay_switch")
+                            modifier = Modifier.testTag("contrast_boost_switch")
                         )
-                    }
-
-                    if (isOverlayEnabled && !hasOverlayPermission) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            "Overlay permission is required to display the floating controls over other apps.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(
-                            onClick = {
-                                val intent = Intent(
-                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    Uri.parse("package:${context.packageName}")
-                                )
-                                context.startActivity(intent)
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        ) {
-                            Icon(Icons.Default.Security, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Grant Overlay Permission")
-                        }
                     }
                 }
             }
 
-            // Notification Info Card
+            // Silent Mode Card
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Notifications,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            "Foreground Notification",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "A persistent notification runs during capture with quick Stop and Pause actions as required by Android MediaProjection standards.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                Icons.Default.VolumeOff,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "Silent Lecture Mode",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "Mute shutter sounds & vibrations in class",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = isSilentCaptureEnabled,
+                            onCheckedChange = {
+                                viewModel.isSilentCaptureEnabled.value = it
+                            },
+                            modifier = Modifier.testTag("silent_mode_switch")
                         )
                     }
                 }

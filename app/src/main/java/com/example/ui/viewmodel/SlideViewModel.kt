@@ -16,6 +16,7 @@ import com.example.export.PdfExporter
 import com.example.service.ActiveCaptureInfo
 import com.example.service.CaptureStateManager
 import com.example.service.CaptureStatus
+import com.example.service.LectureCameraManager
 import com.example.service.ScreenCaptureService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -66,9 +67,13 @@ class SlideViewModel(application: Application) : AndroidViewModel(application) {
     // Settings state
     var captureIntervalSeconds = MutableStateFlow(10)
     var isAutoEdgeDetectionEnabled = MutableStateFlow(true)
-    var isFloatingOverlayEnabled = MutableStateFlow(true)
+    var isEnhanceContrastEnabled = MutableStateFlow(true)
+    var isSilentCaptureEnabled = MutableStateFlow(true)
+    var isFloatingOverlayEnabled = MutableStateFlow(false)
     var currentCropRegion = MutableStateFlow(CropRegion.FULL)
     var sessionTitleInput = MutableStateFlow("Lecture Slides")
+
+    val cameraManager = LectureCameraManager(application, viewModelScope)
 
     // PDF Export progress & result
     private val _isExportingPdf = MutableStateFlow(false)
@@ -86,14 +91,13 @@ class SlideViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setCropRegion(region: CropRegion) {
         currentCropRegion.value = region
+        cameraManager.cropRegion = region
     }
 
-    fun startSession(
-        resultCode: Int,
-        resultData: Intent?,
-        title: String,
-        context: Context
-    ) {
+    /**
+     * Starts a lecture hall slide capture session using the device camera.
+     */
+    fun startCameraSession(title: String, onSessionCreated: (Long) -> Unit) {
         viewModelScope.launch {
             val session = SessionEntity(
                 title = title.ifBlank { "Lecture Session" },
@@ -107,48 +111,46 @@ class SlideViewModel(application: Application) : AndroidViewModel(application) {
             val newSessionId = repository.createSession(session)
             _selectedSessionId.value = newSessionId
 
-            val intent = Intent(context, ScreenCaptureService::class.java).apply {
-                action = ScreenCaptureService.ACTION_START
-                putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, resultCode)
-                putExtra(ScreenCaptureService.EXTRA_RESULT_DATA, resultData)
-                putExtra(ScreenCaptureService.EXTRA_SESSION_ID, newSessionId)
-                putExtra(ScreenCaptureService.EXTRA_SESSION_TITLE, session.title)
-                putExtra(ScreenCaptureService.EXTRA_INTERVAL_SECONDS, session.intervalSeconds)
-                putExtra(ScreenCaptureService.EXTRA_CROP_LEFT, session.cropLeft)
-                putExtra(ScreenCaptureService.EXTRA_CROP_TOP, session.cropTop)
-                putExtra(ScreenCaptureService.EXTRA_CROP_RIGHT, session.cropRight)
-                putExtra(ScreenCaptureService.EXTRA_CROP_BOTTOM, session.cropBottom)
-                putExtra(ScreenCaptureService.EXTRA_AUTO_EDGE, session.edgeDetectionEnabled)
-                putExtra(ScreenCaptureService.EXTRA_SHOW_OVERLAY, isFloatingOverlayEnabled.value)
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            cameraManager.initializeSession(
+                sessionId = newSessionId,
+                title = session.title,
+                interval = session.intervalSeconds,
+                crop = currentCropRegion.value,
+                autoEdge = isAutoEdgeDetectionEnabled.value,
+                enhanceContrast = isEnhanceContrastEnabled.value,
+                silent = isSilentCaptureEnabled.value
+            )
+            cameraManager.startAutoCaptureLoop()
+            onSessionCreated(newSessionId)
         }
     }
 
-    fun pauseCapture(context: Context) {
-        val intent = Intent(context, ScreenCaptureService::class.java).apply {
-            action = ScreenCaptureService.ACTION_PAUSE
-        }
-        context.startService(intent)
+    fun snapSlideNow() {
+        cameraManager.captureFrameNow(isManual = true)
     }
 
-    fun resumeCapture(context: Context) {
-        val intent = Intent(context, ScreenCaptureService::class.java).apply {
-            action = ScreenCaptureService.ACTION_RESUME
-        }
-        context.startService(intent)
+    fun setCameraZoom(ratio: Float) {
+        cameraManager.setZoom(ratio)
     }
 
-    fun stopCapture(context: Context) {
-        val intent = Intent(context, ScreenCaptureService::class.java).apply {
-            action = ScreenCaptureService.ACTION_STOP
-        }
-        context.startService(intent)
+    fun toggleCameraTorch() {
+        cameraManager.toggleTorch()
+    }
+
+    fun nextSimulatedSlide() {
+        cameraManager.nextSimulatedSlide()
+    }
+
+    fun pauseCapture(context: Context? = null) {
+        cameraManager.pauseCapture()
+    }
+
+    fun resumeCapture(context: Context? = null) {
+        cameraManager.resumeCapture()
+    }
+
+    fun stopCapture(context: Context? = null) {
+        cameraManager.stopSession()
     }
 
     fun toggleSlideSelection(slideId: Long, isSelected: Boolean) {

@@ -24,6 +24,12 @@ data class ActiveCaptureInfo(
     val lastSlidePath: String? = null,
     val lastSharpness: Double = 0.0,
     val isAutoEdgeDetectionEnabled: Boolean = true,
+    val isEnhanceContrastEnabled: Boolean = true,
+    val isTorchOn: Boolean = false,
+    val zoomRatio: Float = 1.0f,
+    val isSlideDetected: Boolean = true,
+    val lastCaptureMessage: String? = null,
+    val isSimulatorActive: Boolean = false,
     val isOverlayActive: Boolean = false
 )
 

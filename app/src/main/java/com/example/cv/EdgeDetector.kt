@@ -24,38 +24,93 @@ data class EdgeCropResult(
 object EdgeDetector {
 
     /**
-     * Processes a raw bitmap: runs Canny edge detection + quadrilateral contour detection,
+     * Enhances contrast of lecture slides (auto levels & luminance stretch)
+     * to eliminate wash-out caused by lecture hall ambient lighting and projector glare.
+     */
+    fun enhanceSlideContrast(source: Bitmap): Bitmap {
+        val w = source.width
+        val h = source.height
+        if (w <= 0 || h <= 0) return source
+
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(w * h)
+        source.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        // Find min and max luminance for histogram normalization
+        var minLum = 255
+        var maxLum = 0
+        val sampleStep = (w * h / 2500).coerceAtLeast(1)
+        for (i in pixels.indices step sampleStep) {
+            val p = pixels[i]
+            val lum = (Color.red(p) * 299 + Color.green(p) * 587 + Color.blue(p) * 114) / 1000
+            if (lum < minLum) minLum = lum
+            if (lum > maxLum) maxLum = lum
+        }
+
+        val range = (maxLum - minLum).coerceAtLeast(25)
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val a = Color.alpha(p)
+            val r = ((Color.red(p) - minLum) * 255 / range).coerceIn(0, 255)
+            val g = ((Color.green(p) - minLum) * 255 / range).coerceIn(0, 255)
+            val b = ((Color.blue(p) - minLum) * 255 / range).coerceIn(0, 255)
+            pixels[i] = Color.argb(a, r, g, b)
+        }
+
+        out.setPixels(pixels, 0, w, 0, 0, w, h)
+        return out
+    }
+
+    /**
+     * Processes a raw camera frame: runs Canny edge detection + quadrilateral contour detection,
      * perspective transforms to rectangular slide, or falls back to manual crop region.
      */
     fun processAndCrop(
         source: Bitmap,
         manualCropRegion: CropRegion = CropRegion.FULL,
-        enableAutoEdgeDetection: Boolean = true
+        enableAutoEdgeDetection: Boolean = true,
+        enableEnhanceContrast: Boolean = true
     ): EdgeCropResult {
-        if (!enableAutoEdgeDetection) {
-            return EdgeCropResult(
+        val baseResult = if (!enableAutoEdgeDetection) {
+            EdgeCropResult(
                 bitmap = cropToManualRegion(source, manualCropRegion),
                 isEdgeDetected = false
             )
-        }
-
-        val detectedQuad = detectSlideQuadrilateral(source)
-        if (detectedQuad != null && detectedQuad.size == 4) {
-            val warped = perspectiveTransform(source, detectedQuad)
-            if (warped != null) {
-                return EdgeCropResult(
-                    bitmap = warped,
-                    isEdgeDetected = true,
-                    detectedCorners = detectedQuad
+        } else {
+            val detectedQuad = detectSlideQuadrilateral(source)
+            if (detectedQuad != null && detectedQuad.size == 4) {
+                val warped = perspectiveTransform(source, detectedQuad)
+                if (warped != null) {
+                    EdgeCropResult(
+                        bitmap = warped,
+                        isEdgeDetected = true,
+                        detectedCorners = detectedQuad
+                    )
+                } else {
+                    EdgeCropResult(
+                        bitmap = cropToManualRegion(source, manualCropRegion),
+                        isEdgeDetected = false
+                    )
+                }
+            } else {
+                EdgeCropResult(
+                    bitmap = cropToManualRegion(source, manualCropRegion),
+                    isEdgeDetected = false
                 )
             }
         }
 
-        // Fallback to manual region
-        return EdgeCropResult(
-            bitmap = cropToManualRegion(source, manualCropRegion),
-            isEdgeDetected = false
-        )
+        val finalBitmap = if (enableEnhanceContrast) {
+            val enhanced = enhanceSlideContrast(baseResult.bitmap)
+            if (enhanced != baseResult.bitmap && !baseResult.bitmap.isRecycled && baseResult.bitmap != source) {
+                baseResult.bitmap.recycle()
+            }
+            enhanced
+        } else {
+            baseResult.bitmap
+        }
+
+        return baseResult.copy(bitmap = finalBitmap)
     }
 
     /**

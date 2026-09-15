@@ -1,9 +1,7 @@
 package com.example.ui.screens
 
-import android.app.Activity
+import android.Manifest
 import android.content.Context
-import android.content.Intent
-import android.media.projection.MediaProjectionManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,9 +27,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -94,42 +95,19 @@ fun HomeScreen(
     val currentInterval by viewModel.captureIntervalSeconds.collectAsState()
     val cropRegion by viewModel.currentCropRegion.collectAsState()
 
-    var sessionTitleInput by remember { mutableStateOf("Lecture - ${SimpleDateFormat("MMM d, HH:mm", Locale.US).format(Date())}") }
+    var sessionTitleInput by remember {
+        mutableStateOf("Lecture - ${SimpleDateFormat("MMM d, HH:mm", Locale.US).format(Date())}")
+    }
 
     val isCapturingActive = captureState.status == CaptureStatus.RUNNING || captureState.status == CaptureStatus.PAUSED
 
-    // MediaProjection screen capture intent launcher
-    val mediaProjectionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            viewModel.startSession(
-                resultCode = result.resultCode,
-                resultData = result.data,
-                title = sessionTitleInput,
-                context = context
-            )
-            onNavigateToActiveCapture()
-        } else {
-            // User cancelled or demo feed mode fallback
-            viewModel.startSession(
-                resultCode = Activity.RESULT_CANCELED,
-                resultData = null,
-                title = sessionTitleInput,
-                context = context
-            )
-            onNavigateToActiveCapture()
-        }
-    }
-
-    // Permission launcher for Notifications on Android 13+
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+    // Camera permission launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        // Continue to screen capture intent
-        val mpm = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
-        mpm?.createScreenCaptureIntent()?.let { intent ->
-            mediaProjectionLauncher.launch(intent)
+    ) { isGranted ->
+        // Start camera session regardless (with real camera if granted, or simulator fallback if denied)
+        viewModel.startCameraSession(sessionTitleInput) {
+            onNavigateToActiveCapture()
         }
     }
 
@@ -249,13 +227,22 @@ fun HomeScreen(
                     )
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.CameraAlt,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Capture Lecture Slides",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         Text(
-                            "Record Live Presentation",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "Captures slides automatically in background, crops edges, and groups duplicate slides.",
+                            "Point device camera at the lecture hall projector screen or board. Auto-corrects keystone distortion, sharpens text, and deduplicates slides.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
@@ -264,7 +251,7 @@ fun HomeScreen(
                         OutlinedTextField(
                             value = sessionTitleInput,
                             onValueChange = { sessionTitleInput = it },
-                            label = { Text("Lecture / Presentation Title") },
+                            label = { Text("Course / Lecture Title") },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("session_title_input"),
@@ -290,7 +277,7 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 val isCustomCrop = cropRegion.left > 0f || cropRegion.top > 0f || cropRegion.right < 1f || cropRegion.bottom < 1f
                                 Text(
-                                    if (isCustomCrop) "Region: Custom" else "Crop: Full",
+                                    if (isCustomCrop) "Keystone: Custom" else "Keystone: Auto",
                                     fontSize = 12.sp
                                 )
                             }
@@ -310,14 +297,7 @@ fun HomeScreen(
 
                         Button(
                             onClick = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                                } else {
-                                    val mpm = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
-                                    mpm?.createScreenCaptureIntent()?.let { intent ->
-                                        mediaProjectionLauncher.launch(intent)
-                                    }
-                                }
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -325,9 +305,9 @@ fun HomeScreen(
                                 .testTag("start_capture_button"),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            Icon(Icons.Default.PhotoCamera, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Start Slide Recording", fontWeight = FontWeight.Bold)
+                            Text("Start Camera Capture", fontWeight = FontWeight.Bold)
                         }
                     }
                 }

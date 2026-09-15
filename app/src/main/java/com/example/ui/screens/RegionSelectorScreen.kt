@@ -77,12 +77,12 @@ fun RegionSelectorScreen(
                 title = {
                     Column {
                         Text(
-                            "Slide Region Selector",
+                            "Projector Crop & Framing",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "Exclude browser chrome & speaker video",
+                            "Target projector screen & exclude classroom foreground",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

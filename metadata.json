@@ -1,6 +1,6 @@
 {
   "name": "SlideCapture",
-  "description": "Automatic lecture slide recording with edge-detection cropping, perceptual deduplication, and PDF export",
+  "description": "Capture lecture slides with the camera in a lecture hall, featuring automatic projector screen detection, keystone correction, slide deduplication, and PDF export.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
