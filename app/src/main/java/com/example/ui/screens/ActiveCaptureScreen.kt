@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -53,6 +54,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -74,6 +76,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -148,7 +151,7 @@ fun ActiveCaptureScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Live Camera Viewfinder Card
+            // Live Camera Viewfinder Card - Increased size for lecture hall
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
@@ -156,7 +159,7 @@ fun ActiveCaptureScreen(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 10f)
+                    .height(340.dp)
                     .clip(RoundedCornerShape(16.dp))
             ) {
                 Box(
@@ -296,256 +299,309 @@ fun ActiveCaptureScreen(
                         }
                     }
 
-                    // Bottom Viewfinder Bar (Zoom controls & Shutter)
-                    Row(
+                    // Bottom Viewfinder Controls (Manual Zoom Slider + Presets + Shutter)
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.BottomCenter)
-                            .background(Color.Black.copy(alpha = 0.5f))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
                     ) {
-                        // Zoom Ratio Selector
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf(1.0f, 1.5f, 2.0f, 3.0f).forEach { zoom ->
-                                val isSelected = captureInfo.zoomRatio == zoom
-                                Surface(
-                                    color = if (isSelected) CyanAccent else Color.White.copy(alpha = 0.2f),
-                                    shape = CircleShape,
-                                    modifier = Modifier.clickable {
-                                        viewModel.setCameraZoom(zoom)
+                        // Manual Zoom Slider Row with Presets and Current Zoom Readout
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Quick zoom presets
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                listOf(1.0f, 2.0f, 3.0f, 5.0f).forEach { presetZoom ->
+                                    val isSelected = kotlin.math.abs(captureInfo.zoomRatio - presetZoom) < 0.25f
+                                    Surface(
+                                        color = if (isSelected) CyanAccent else Color.White.copy(alpha = 0.2f),
+                                        shape = CircleShape,
+                                        modifier = Modifier.clickable {
+                                            viewModel.setCameraZoom(presetZoom)
+                                        }
+                                    ) {
+                                        Text(
+                                            "${presetZoom.toInt()}x",
+                                            color = if (isSelected) Color.Black else Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                        )
                                     }
+                                }
+                            }
+
+                            // Manual Zoom Slider
+                            Slider(
+                                value = captureInfo.zoomRatio.coerceIn(1.0f, 5.0f),
+                                onValueChange = { newZoom ->
+                                    viewModel.setCameraZoom(newZoom)
+                                },
+                                valueRange = 1.0f..5.0f,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("camera_zoom_slider")
+                            )
+
+                            // Current Zoom Pill
+                            Surface(
+                                color = Color.Black.copy(alpha = 0.7f),
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(1.dp, CyanAccent.copy(alpha = 0.6f))
+                            ) {
+                                Text(
+                                    String.format(Locale.US, "%.1fx", captureInfo.zoomRatio),
+                                    color = CyanAccent,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Shutter button (Snap Slide Now)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier
+                                    .clickable { viewModel.snapSlideNow() }
+                                    .testTag("snap_slide_shutter_button")
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                                 ) {
+                                    Icon(
+                                        Icons.Default.PhotoCamera,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        "${zoom.toInt()}x",
-                                        color = if (isSelected) Color.Black else Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        "Snap Slide Now",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
                         }
-
-                        // Shutter button (Snap Slide Now)
-                        Surface(
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier
-                                .clickable { viewModel.snapSlideNow() }
-                                .testTag("snap_slide_shutter_button")
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.PhotoCamera,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    "Snap Slide",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
                     }
                 }
             }
 
-            // Live Lecture Progress Card
+            // Consolidated Lecture Session & Latest Rectified Slide Card (Merged simplified single card)
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        captureInfo.sessionTitle.ifBlank { "Lecture Slides" },
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Slides count badge
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            "${captureInfo.captureCount}",
-                            style = MaterialTheme.typography.displayMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            if (captureInfo.captureCount == 1) "slide captured" else "slides captured",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Countdown indicator
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        if (isRunning) {
-                            val total = captureInfo.intervalSeconds.toFloat().coerceAtLeast(1f)
-                            val remaining = captureInfo.nextCaptureInSeconds.toFloat().coerceAtLeast(0f)
-                            CircularProgressIndicator(
-                                progress = { ((total - remaining) / total).coerceIn(0f, 1f) },
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.5.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                "Auto-analyzing screen in ${captureInfo.nextCaptureInSeconds}s (Interval: ${captureInfo.intervalSeconds}s)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            Text(
-                                "Capture paused. Tap Resume to continue.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AmberWarning
-                            )
-                        }
-                    }
-
-                    captureInfo.lastCaptureMessage?.let { msg ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                msg,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Latest Captured Slide Preview Card
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                    // Header: Session Title, Slide Counter & Countdown Status
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "Latest Rectified Slide",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (captureInfo.lastSharpness > 0) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                captureInfo.sessionTitle.ifBlank { "Lecture Slides" },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    "Sharpness: ${String.format(Locale.US, "%.1f", captureInfo.lastSharpness)}",
+                                    "${captureInfo.captureCount}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    if (captureInfo.captureCount == 1) "slide captured" else "slides captured",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Real-time Countdown / Pause Status Indicator
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isPaused) AmberWarning.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                if (isRunning) {
+                                    val total = captureInfo.intervalSeconds.toFloat().coerceAtLeast(1f)
+                                    val remaining = captureInfo.nextCaptureInSeconds.toFloat().coerceAtLeast(0f)
+                                    CircularProgressIndicator(
+                                        progress = { ((total - remaining) / total).coerceIn(0f, 1f) },
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "${captureInfo.nextCaptureInSeconds}s (${captureInfo.intervalSeconds}s)",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(AmberWarning)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "Paused",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AmberWarning
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Status / Deduplication message banner
+                    captureInfo.lastCaptureMessage?.let { msg ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = CyanAccent,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    msg,
                                     fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    fontWeight = FontWeight.SemiBold
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    // Latest Rectified Slide Preview
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF0B0F17))
+                    ) {
+                        val lastPath = captureInfo.lastSlidePath
+                        val previewBitmap: Bitmap? = CaptureStateManager.latestBitmapPreview
 
-                    val lastPath = captureInfo.lastSlidePath
-                    val previewBitmap: Bitmap? = CaptureStateManager.latestBitmapPreview
-
-                    if (lastPath != null && File(lastPath).exists()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(File(lastPath))
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Latest Captured Slide",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.Black),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else if (previewBitmap != null && !previewBitmap.isRecycled) {
-                        Image(
-                            bitmap = previewBitmap.asImageBitmap(),
-                            contentDescription = "Latest Captured Slide Preview",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.Black),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF0F172A)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                                Spacer(modifier = Modifier.height(8.dp))
+                        if (lastPath != null && File(lastPath).exists()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(File(lastPath))
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Latest Captured Slide",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        } else if (previewBitmap != null && !previewBitmap.isRecycled) {
+                            Image(
+                                bitmap = previewBitmap.asImageBitmap(),
+                                contentDescription = "Latest Captured Slide Preview",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        } else {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    "Point camera at lecture slide...",
+                                    "Waiting for slide capture...",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                        // Bottom info strip across preview: Keystone, Sharpness, Contrast
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .background(Color.Black.copy(alpha = 0.65f))
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (captureInfo.isAutoEdgeDetectionEnabled) "Keystone: 16:9" else "Keystone: Off",
+                                fontSize = 11.sp,
+                                color = CyanAccent,
+                                fontWeight = FontWeight.Medium
+                            )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            if (captureInfo.isAutoEdgeDetectionEnabled) "Keystone: Rectified (16:9)" else "Keystone: Manual",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = CyanAccent
-                        )
-                        Text(
-                            if (captureInfo.isEnhanceContrastEnabled) "Contrast: Boosted" else "Contrast: Standard",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = EmeraldSuccess
-                        )
+                            if (captureInfo.lastSharpness > 0) {
+                                Text(
+                                    "Sharpness: ${String.format(Locale.US, "%.1f", captureInfo.lastSharpness)}",
+                                    fontSize = 11.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Text(
+                                if (captureInfo.isEnhanceContrastEnabled) "Contrast: Boosted" else "Contrast: Standard",
+                                fontSize = 11.sp,
+                                color = EmeraldSuccess,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
